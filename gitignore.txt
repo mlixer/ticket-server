@@ -1,0 +1,6 @@
+# .gitignore for ticket-server
+tickets.db
+*.db
+.venv/
+__pycache__/
+*.pyc

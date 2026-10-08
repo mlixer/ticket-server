@@ -1,0 +1,61 @@
+# ticket-server.service — Ticket Server (systemd user unit) — TEMPLATE
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp ticket-server.service ~/.config/systemd/user/
+#   # EDIT every <<< EDIT line below first, then:
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now ticket-server
+#
+# Watch logs:
+#   journalctl --user -u ticket-server -f
+#
+# After changing Environment= lines:
+#   systemctl --user daemon-reload && systemctl --user restart ticket-server
+
+[Unit]
+Description=Companion Ticket Server
+After=default.target
+
+[Service]
+Type=simple
+# <<< EDIT: directory containing ticket_server.py (tickets.db lives here too)
+WorkingDirectory=%h/ticket-server
+
+# --- Ticket server config ---
+Environment=HERMES_MODE=real
+Environment=HERMES_TIMEOUT=1200
+# Bind stays on loopback FOREVER. For phone access, front it with
+# tailscale-serve (TLS on your tailnet hostname, proxied to this port).
+Environment=TICKET_HOST=127.0.0.1
+Environment=TICKET_PORT=8002
+# <<< EDIT: the ST origins allowed to call this server from a browser.
+# Keep the loopback pair; ADD your tailnet ST origin for phone access,
+# e.g. https://<your-host>.<your-tailnet>.ts.net
+Environment=TICKET_CORS_ORIGINS=http://127.0.0.1:8000,http://localhost:8000
+# Podman (rootless) needs the user runtime dir when run from a service.
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+# Per-ticket lockdown: toolsets allowed in ticket runs. Deliberately excludes
+# every self-modifying surface (skills/cron/messaging/delegation/browser).
+Environment=TICKET_TOOLSETS=web,terminal,file,todo
+Environment=TICKET_MAX_TURNS=40
+# Wake-after-quiet: a burst of experience flushes -> ONE reconcile wake after
+# this many seconds of silence (code default 75).
+Environment=RECONCILE_DEBOUNCE_S=150
+# Shared state dirs INSIDE the agent container (podman volume paths).
+# <<< EDIT if yours differ from the defaults:
+#Environment=STATE_DIR=/opt/data/shared/companion_state
+#Environment=IDENTITY_DIR=/opt/data/shared/companion_identity
+# Experience drops older than this are archived to drops/archive/ (0 = never).
+#Environment=DROPS_RETENTION_DAYS=14
+# Tickets-only install? Set 0 to disable the SES nervous system entirely
+# (no state injection, no experience drops, no reconcile wakes).
+#Environment=SES_ENABLED=1
+# <<< EDIT: python path if you use a venv (e.g. %h/ticket-server/.venv/bin/python3)
+ExecStart=/usr/bin/python3 ticket_server.py
+
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
